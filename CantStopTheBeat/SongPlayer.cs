@@ -41,6 +41,9 @@ namespace CantStopTheBeat
         int posInBuff;
         int read;
 
+        //other
+        InterpretedTag tag;
+
         //??? do i need all this
         /*
         Queue<short[]> dataQueue;
@@ -59,6 +62,7 @@ namespace CantStopTheBeat
             files = filePaths;
             fileNum = 0;
             bridge = new Mp3FileReader(files[fileNum]);  //load up the first file in the list
+            tag = new InterpretedTag(bridge.Id3v2Tag); //read its tag
 
             inputStream = WaveFormatConversionStream.CreatePcmStream(bridge);  //convert it to PCM
 
@@ -113,6 +117,7 @@ namespace CantStopTheBeat
             inputStream.Dispose();
             bridge = new Mp3FileReader(files[fileNum]);
             inputStream = new WaveFormatConversionStream(WaveFormat, bridge);
+            tag = new InterpretedTag(bridge.Id3v2Tag);
         }
 
         public void start()
@@ -136,31 +141,20 @@ namespace CantStopTheBeat
             else
                 spriteBatch.DrawString(font, "No Xing header!", new Microsoft.Xna.Framework.Vector2(5, 5), Microsoft.Xna.Framework.Color.Black);
 
-            byte[] tagv1 = bridge.Id3v1Tag;
-            if(tagv1 != null)
-            {
-                string read = "";
-                foreach(byte bt in tagv1)
-                {
-                    read = read + bt.ToString() + " ";
-                }
-                spriteBatch.DrawString(font, read, new Microsoft.Xna.Framework.Vector2(5, 105), Microsoft.Xna.Framework.Color.Black);
-            }
+            if (tag.title != null)
+                spriteBatch.DrawString(font, tag.title, new Microsoft.Xna.Framework.Vector2(5, 25), Microsoft.Xna.Framework.Color.Black);
             else
-                spriteBatch.DrawString(font, "No Id3v1 tag!", new Microsoft.Xna.Framework.Vector2(5, 105), Microsoft.Xna.Framework.Color.Black);
+                spriteBatch.DrawString(font, "No title tag!", new Microsoft.Xna.Framework.Vector2(5, 25), Microsoft.Xna.Framework.Color.Black);
 
-            Id3v2Tag tagv2 = bridge.Id3v2Tag;
-            if (tagv2 != null)
-            {
-                string read = "";
-                foreach (byte bt in tagv1)
-                {
-                    read = read + bt.ToString() + " ";
-                }
-                spriteBatch.DrawString(font, read, new Microsoft.Xna.Framework.Vector2(5, 205), Microsoft.Xna.Framework.Color.Black);
-            }
+            if (tag.artist != null)
+                spriteBatch.DrawString(font, tag.artist, new Microsoft.Xna.Framework.Vector2(5, 45), Microsoft.Xna.Framework.Color.Black);
             else
-                spriteBatch.DrawString(font, "No Id3v2 tag!", new Microsoft.Xna.Framework.Vector2(5, 205), Microsoft.Xna.Framework.Color.Black);
+                spriteBatch.DrawString(font, "No artist tag!", new Microsoft.Xna.Framework.Vector2(5, 45), Microsoft.Xna.Framework.Color.Black);
+
+            if (tag.album != null)
+                spriteBatch.DrawString(font, tag.album, new Microsoft.Xna.Framework.Vector2(5, 65), Microsoft.Xna.Framework.Color.Black);
+            else
+                spriteBatch.DrawString(font, "No album tag!", new Microsoft.Xna.Framework.Vector2(5, 65), Microsoft.Xna.Framework.Color.Black);
         }
 
     }
