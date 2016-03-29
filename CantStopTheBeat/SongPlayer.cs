@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using NAudio.Wave;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace CantStopTheBeat
 {
@@ -25,7 +26,6 @@ namespace CantStopTheBeat
         //output-to-player-type stuff
         const int bufferSize = 16384;  //based on being the lowest power of two above a certain length of time
                                        //still kind of magic number-y
-        byte[] buffer;
         IWavePlayer player;
         public WaveFormat WaveFormat
         {
@@ -36,13 +36,14 @@ namespace CantStopTheBeat
         }
         private WaveFormat waveFormat;
 
-
+        //tracking-type stuff
+        byte[] buffer;
+        int posInBuff;
+        int read;
 
         //??? do i need all this
         /*
         Queue<short[]> dataQueue;
-        int posInBuff;
-        int read;
         StreamWriter outstream;
         double[][] toPassToFFT;
         public bool newFFTData;
@@ -67,7 +68,7 @@ namespace CantStopTheBeat
             waveFormat = inputStream.WaveFormat;
         }
 
-        public int Read(byte[] buffer, int offset, int count)
+        public int Read(byte[] outBuff, int offset, int count)
         {
             if(playlistEnded)
             {
@@ -90,12 +91,28 @@ namespace CantStopTheBeat
                 int length = Math.Min(count - logged, read - posInBuff);
                 Array.Copy(buffer, posInBuff, outBuff, offset + logged, length);
                 logged += length;
+
+                posInBuff += length;
             }
+            return logged;
         }
 
-        public WaveFormat WaveFormat
+        private void nextFile()
         {
-            get { throw new NotImplementedException(); }
+            //newFFTData = false;
+
+            fileNum++;
+            if (fileNum >= files.Length)
+            {
+                playlistEnded = true;
+                return;
+            }
+            bridge.Close();
+            bridge.Dispose();
+            inputStream.Close();
+            inputStream.Dispose();
+            bridge = new Mp3FileReader(files[fileNum]);
+            inputStream = new WaveFormatConversionStream(WaveFormat, bridge);
         }
 
         public void start()
@@ -107,8 +124,43 @@ namespace CantStopTheBeat
 
         public void stopped(Object sender, EventArgs e)
         {
-            Console.WriteLine("Stopped");  //i think this is just a "let's put this here and see if it ever happens" kind of thing
+            //this does in fact happen when the playlist is concluded.
             //ended = true;
+        }
+
+        public void draw(SpriteBatch spriteBatch, SpriteFont font)
+        {
+            XingHeader head = bridge.XingHeader;
+            if(head != null)
+                spriteBatch.DrawString(font, head.ToString(), new Microsoft.Xna.Framework.Vector2(5, 5), Microsoft.Xna.Framework.Color.Black);
+            else
+                spriteBatch.DrawString(font, "No Xing header!", new Microsoft.Xna.Framework.Vector2(5, 5), Microsoft.Xna.Framework.Color.Black);
+
+            byte[] tagv1 = bridge.Id3v1Tag;
+            if(tagv1 != null)
+            {
+                string read = "";
+                foreach(byte bt in tagv1)
+                {
+                    read = read + bt.ToString() + " ";
+                }
+                spriteBatch.DrawString(font, read, new Microsoft.Xna.Framework.Vector2(5, 105), Microsoft.Xna.Framework.Color.Black);
+            }
+            else
+                spriteBatch.DrawString(font, "No Id3v1 tag!", new Microsoft.Xna.Framework.Vector2(5, 105), Microsoft.Xna.Framework.Color.Black);
+
+            Id3v2Tag tagv2 = bridge.Id3v2Tag;
+            if (tagv2 != null)
+            {
+                string read = "";
+                foreach (byte bt in tagv1)
+                {
+                    read = read + bt.ToString() + " ";
+                }
+                spriteBatch.DrawString(font, read, new Microsoft.Xna.Framework.Vector2(5, 205), Microsoft.Xna.Framework.Color.Black);
+            }
+            else
+                spriteBatch.DrawString(font, "No Id3v2 tag!", new Microsoft.Xna.Framework.Vector2(5, 205), Microsoft.Xna.Framework.Color.Black);
         }
 
     }

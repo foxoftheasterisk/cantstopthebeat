@@ -7,12 +7,15 @@ namespace CantStopTheBeat
     /// <summary>
     /// This is the main type for your game
     /// </summary>
-    public class Game1 : Game
+    public class CantStopTheBeat : Game
     {
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
 
-        public Game1()
+        SongPlayer test;
+        SpriteFont font;
+
+        public CantStopTheBeat()
             : base()
         {
             graphics = new GraphicsDeviceManager(this);
@@ -28,6 +31,8 @@ namespace CantStopTheBeat
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
+            test = new SongPlayer(new string[] { "testsongs/happiest.mp3" , "testsongs/brick2.mp3" });
+            test.start();
 
             base.Initialize();
         }
@@ -40,6 +45,8 @@ namespace CantStopTheBeat
         {
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
+
+            font = this.Content.Load<SpriteFont>("someFont");
 
             // TODO: use this.Content to load your game content here
         }
@@ -76,7 +83,11 @@ namespace CantStopTheBeat
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
-            // TODO: Add your drawing code here
+            spriteBatch.Begin();
+
+            test.draw(spriteBatch, font);
+
+            spriteBatch.End();
 
             base.Draw(gameTime);
         }
