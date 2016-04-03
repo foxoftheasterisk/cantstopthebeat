@@ -18,6 +18,12 @@ namespace CantStopTheBeat
         Mp3FileReader bridge;
         WaveStream inputStream;
 
+        Mp3FileReader nextBridge;
+        WaveStream nextStream;
+        bool inNextFile = false;
+        bool noNextFile = false;
+        bool inRead;
+
         //FFT-type stuff
         double[][] toPassToFFT;
         public bool newFFTData;
@@ -70,26 +76,56 @@ namespace CantStopTheBeat
 
             player = new DirectSoundOut(100);
             waveFormat = inputStream.WaveFormat;
+
+            if(fileNum + 1 < files.Length)
+            {
+                nextBridge = new Mp3FileReader(files[fileNum + 1]);
+
+                nextStream = WaveFormatConversionStream.CreatePcmStream(nextBridge);
+            }
         }
 
         public int Read(byte[] outBuff, int offset, int count)
         {
-            if(playlistEnded)
+            if(inNextFile && noNextFile)
             {
                 return 0;
             }
+            inRead = true;
             int logged = 0;
             while (logged < count)
             {
-                if (posInBuff >= read - 1)
+                if (!inNextFile)
                 {
-                    read = inputStream.Read(buffer, 0, buffer.Length);
-                    posInBuff = 0;
-                    if (read == 0)
+                    if (posInBuff >= read - 1)
                     {
-                        nextFile();
-                        if (playlistEnded)
-                            break;
+                        read = inputStream.Read(buffer, 0, buffer.Length);
+                        posInBuff = 0;
+                        if (read == 0)
+                        {
+                            if (noNextFile)
+                                break;
+                            waveFormat = nextStream.WaveFormat;
+                            inNextFile = true;
+                            continue;
+                        }
+                    }
+                }
+                else
+                {
+                    if (posInBuff >= read - 1)
+                    {
+                        read = nextStream.Read(buffer, 0, buffer.Length);
+                        posInBuff = 0;
+                        if (read == 0)
+                        {
+                            nextFile();
+                            inNextFile = true;
+                            if (noNextFile)
+                                break;
+                            waveFormat = nextStream.WaveFormat;
+                            continue;
+                        }
                     }
                 }
                 int length = Math.Min(count - logged, read - posInBuff);
@@ -98,26 +134,44 @@ namespace CantStopTheBeat
 
                 posInBuff += length;
             }
+            inRead = false;
             return logged;
+        }
+
+        public void Update()
+        {
+            if (inNextFile && !noNextFile && !inRead)
+            {
+                nextFile();
+            }
         }
 
         private void nextFile()
         {
-            //newFFTData = false;
+            if (noNextFile)
+                throw new InvalidOperationException("Tried to advance while no next file!");
 
-            fileNum++;
-            if (fileNum >= files.Length)
-            {
-                playlistEnded = true;
-                return;
-            }
+            //newFFTData = false;
             bridge.Close();
             bridge.Dispose();
             inputStream.Close();
             inputStream.Dispose();
-            bridge = new Mp3FileReader(files[fileNum]);
-            inputStream = new WaveFormatConversionStream(WaveFormat, bridge);
+
+            bridge = nextBridge;
+            inputStream = nextStream;
             tag = new InterpretedTag(bridge.Id3v2Tag);
+
+            inNextFile = false;
+
+            fileNum++;
+            if (fileNum + 1 >= files.Length)
+            {
+                noNextFile = true;
+                return;
+            }
+            
+            nextBridge = new Mp3FileReader(files[fileNum + 1]);
+            nextStream = new WaveFormatConversionStream(WaveFormat, nextBridge);
         }
 
         public void start()

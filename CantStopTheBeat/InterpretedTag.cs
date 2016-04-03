@@ -127,6 +127,8 @@ namespace CantStopTheBeat
 
                 currentByte += frameSize;
 
+                if (currentByte + 3 >= tagContent.Length)
+                    break;
 
                 frameID = ((char)tagContent[currentByte]).ToString()
                 + ((char)tagContent[currentByte + 1]).ToString()
