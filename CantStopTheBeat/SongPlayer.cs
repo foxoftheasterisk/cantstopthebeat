@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using NAudio.Wave;
 using Microsoft.Xna.Framework.Graphics;
+using CSTBLibrary;
+using System.Numerics;
 
 namespace CantStopTheBeat
 {
@@ -25,9 +27,12 @@ namespace CantStopTheBeat
         bool inRead;
 
         //FFT-type stuff
-        double[][] toPassToFFT;
-        public bool newFFTData;
-        const int fftSize = 8192;
+        CircularBuffer<Complex>[] FFTDataCollector;
+        const int fftDataSize = 8192;   //preferred sample size for an FFT run
+        double[][] FFTResults;
+
+        //TEMP
+        double highestFFTMagnitude;
 
         //output-to-player-type stuff
         const int bufferSize = 16384;  //based on being the lowest power of two above a certain length of time
@@ -50,16 +55,7 @@ namespace CantStopTheBeat
         //other
         InterpretedTag tag;
 
-        //??? do i need all this
-        /*
-        Queue<short[]> dataQueue;
-        StreamWriter outstream;
-        double[][] toPassToFFT;
-        public bool newFFTData;
-        const int fftSize = 8192;   //preferred sample size for an FFT run
-         */
-
-        bool playlistEnded = false;
+        //bool playlistEnded = false;
 
         //bool ended = false;
 
@@ -77,7 +73,13 @@ namespace CantStopTheBeat
             player = new DirectSoundOut(100);
             waveFormat = inputStream.WaveFormat;
 
-            if(fileNum + 1 < files.Length)
+            FFTDataCollector = new CircularBuffer<Complex>[waveFormat.Channels];
+            for (int i = 0; i < FFTDataCollector.Length; i++)
+            {
+                FFTDataCollector[i] = new CircularBuffer<Complex>(fftDataSize);
+            }
+
+            if (fileNum + 1 < files.Length)
             {
                 nextBridge = new Mp3FileReader(files[fileNum + 1]);
 
@@ -106,6 +108,15 @@ namespace CantStopTheBeat
                             if (noNextFile)
                                 break;
                             waveFormat = nextStream.WaveFormat;
+                            if (FFTDataCollector.Length != waveFormat.Channels)
+                            {
+                                //FFT format needs to keep up with stream format
+                                FFTDataCollector = new CircularBuffer<Complex>[waveFormat.Channels];
+                                for (int i = 0; i < FFTDataCollector.Length; i++)
+                                {
+                                    FFTDataCollector[i] = new CircularBuffer<Complex>(fftDataSize);
+                                }
+                            }
                             inNextFile = true;
                             continue;
                         }
@@ -124,6 +135,15 @@ namespace CantStopTheBeat
                             if (noNextFile)
                                 break;
                             waveFormat = nextStream.WaveFormat;
+                            if (FFTDataCollector.Length != waveFormat.Channels)
+                            {
+                                //FFT format needs to keep up with stream format
+                                FFTDataCollector = new CircularBuffer<Complex>[waveFormat.Channels];
+                                for (int i = 0; i < FFTDataCollector.Length; i++)
+                                {
+                                    FFTDataCollector[i] = new CircularBuffer<Complex>(fftDataSize);
+                                }
+                            }
                             continue;
                         }
                     }
@@ -132,7 +152,22 @@ namespace CantStopTheBeat
                 Array.Copy(buffer, posInBuff, outBuff, offset + logged, length);
                 logged += length;
 
-                posInBuff += length;
+                //this part does not play audio,
+                //but instead pipes the same data to the FFT
+                //has to be in here because the stream can't be read without advancing
+                //(alternatively, we could read to the FFT first and then pass from there to this, but this seems more sensible.)
+                for (int end = posInBuff + length; posInBuff < end; posInBuff += 2 * WaveFormat.Channels)
+                {
+                    for (int i = 0; i < WaveFormat.Channels; i++)
+                    {
+                        Complex c = new Complex(buffer[posInBuff + i * 2] + (short)(buffer[posInBuff + (i * 2) + 1] << 8), 0);
+                        //compose the two bytes together, and add an imaginary (of 0) to make a complex number
+                        //because fouriers take complex numbers
+
+                        FFTDataCollector[i].Add(c);
+                    }
+                }
+
             }
             inRead = false;
             return logged;
@@ -144,6 +179,34 @@ namespace CantStopTheBeat
             {
                 nextFile();
             }
+
+            if(FFTDataCollector[0].IsFull)
+            {
+                //then all should be full, as they're supposed to have the same amount of data.
+
+                highestFFTMagnitude = 0;
+                FFTResults = new double[WaveFormat.Channels][];
+
+                for(int i = 0; i < WaveFormat.Channels; i++)
+                {
+                    if (!FFTDataCollector[i].IsFull)
+                        throw new InvalidOperationException("Some FFTs are full but not all????");
+
+                    FFTResults[i] = new double[fftDataSize];
+
+                    Complex[] FFTData = FFTDataCollector[i].getArray();
+                    MathNet.Numerics.IntegralTransforms.Fourier.Forward(FFTData);
+
+                    for(int j=0; j < fftDataSize; j++)
+                    {
+                        FFTResults[i][j] = FFTData[j].Magnitude;
+                        if (FFTResults[i][j] > highestFFTMagnitude)
+                            highestFFTMagnitude = FFTResults[i][j];
+                    }
+                }
+            }
+
+
         }
 
         private void nextFile()
@@ -209,6 +272,10 @@ namespace CantStopTheBeat
                 spriteBatch.DrawString(font, tag.album, new Microsoft.Xna.Framework.Vector2(5, 65), Microsoft.Xna.Framework.Color.Black);
             else
                 spriteBatch.DrawString(font, "No album tag!", new Microsoft.Xna.Framework.Vector2(5, 65), Microsoft.Xna.Framework.Color.Black);
+
+            spriteBatch.DrawString(font, highestFFTMagnitude.ToString(), new Microsoft.Xna.Framework.Vector2(5, 85), Microsoft.Xna.Framework.Color.Black);
+
+
         }
 
     }

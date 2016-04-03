@@ -31,7 +31,7 @@ namespace CantStopTheBeat
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
-            test = new SongPlayer(new string[] { "testsongs/zeldthing.mp3", "testsongs/happiest.mp3" , "testsongs/brick2.mp3" });
+            test = new SongPlayer(new string[] { "testsongs/zeldthing.mp3", "testsongs/brick1.mp3", "testsongs/happiest.mp3" , "testsongs/brick2.mp3" });
             test.start();
 
             base.Initialize();
